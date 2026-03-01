@@ -32,6 +32,7 @@ function defaultPlan(){
     {id:5,day:'A',muscle:'כתפיים',name:'הרחקת כתפיים במכונה',reps:'12-15',sets:3,weights:[27,36,36],coach:'דרופ סט בסט אחרון',rest:90},
     {id:6,day:'A',muscle:'יד אחורית',name:'פשיטת מרפק מאחורי הראש — פולי תחתון',reps:'10-15',sets:3,weights:[25,30,30],coach:'',rest:90},
     {id:7,day:'A',muscle:'יד אחורית',name:'פשיטת מרפק עם מוט ישר / חבל / משולש',reps:'8-10',sets:3,weights:[35,35,35],coach:'דרופ סט בסט אחרון',rest:90},
+
     {id:8,day:'B',muscle:'גב',name:'משיכה באחיזה רוחב כתפיים — פולי עליון',reps:'8-10',sets:3,weights:[87.5,90,90],coach:'',rest:120},
     {id:9,day:'B',muscle:'גב',name:'משיכה בסופינציה — פולי עליון',reps:'8-10',sets:3,weights:[87.5,87.5,87.5],coach:'',rest:90},
     {id:10,day:'B',muscle:'גב',name:'חתירה במכונה',reps:'8-10',sets:3,weights:[55,55,55],coach:'',rest:90},
@@ -40,6 +41,20 @@ function defaultPlan(){
     {id:13,day:'B',muscle:'יד קידמית',name:'כפיפת מרפק בשיפוע חיובי 60°',reps:'6,8,10,15',sets:3,weights:[12.5,15,15],coach:'',rest:90},
     {id:14,day:'B',muscle:'יד קידמית',name:'כפיפת מרפק יד-יד במכונה',reps:'20,15,12',sets:3,weights:[45,31.5,38],coach:'',rest:90},
     {id:15,day:'B',muscle:'בטן',name:'תרגיל בטן לבחירה',reps:'10-12',sets:3,weights:[0,0,0],coach:'לא חובה',rest:60},
+
+    {id:16,day:'C',muscle:'רגליים',name:'לג פרס רגל-רגל',reps:'8-10',sets:3,weights:[20,20,20],coach:'',rest:120},
+    {id:17,day:'C',muscle:'רגליים',name:'האק סקוואט',reps:'10-12',sets:3,weights:[35,30,30],coach:'',rest:120},
+    {id:18,day:'C',muscle:'רגליים',name:'פשיטת ברכיים במכונה',reps:'10-12',sets:3,weights:[20,20,20],coach:'',rest:90},
+    {id:19,day:'C',muscle:'רגליים',name:'כפיפת ברכיים במכונה',reps:'10-12',sets:3,weights:[35,40,40],coach:'',rest:90},
+    {id:20,day:'C',muscle:'רגליים',name:'תאומים',reps:'10-12',sets:3,weights:[40,40,30],coach:'',rest:90},
+    {id:21,day:'C',muscle:'כתפיים',name:'לחיצת כתפיים משקולות יד',reps:'6-8',sets:3,weights:[25,25,20],coach:'',rest:90},
+
+    {id:22,day:'D',muscle:'גב',name:'משיכה באחיזה משולש סופינציה',reps:'6-8',sets:3,weights:[85,85,85],coach:'',rest:120},
+    {id:23,day:'D',muscle:'גב',name:'חתירה רחבה בישיבה',reps:'12',sets:3,weights:[41,50,18],coach:'',rest:90},
+    {id:24,day:'D',muscle:'חזה',name:'אהמר עליון',reps:'10-12',sets:3,weights:[35,35,30],coach:'',rest:90},
+    {id:25,day:'D',muscle:'חזה',name:'פרפר לבחירה',reps:'12-15',sets:3,weights:[64,68,68],coach:'',rest:90},
+    {id:26,day:'D',muscle:'יד אחורית',name:'פשיטה יד-יד',reps:'8-10',sets:3,weights:[24,24,31],coach:'',rest:90},
+    {id:27,day:'D',muscle:'יד קידמית',name:'כפיפה בשיפוע על ספסל',reps:'10-12',sets:3,weights:[20,20,20],coach:'',rest:90},
   ];
 }
 
@@ -384,7 +399,7 @@ function renderHistory(){
   list.innerHTML=history.slice(0,30).map((h,i)=>{
     const date=new Date(h.date).toLocaleDateString('he-IL',{weekday:'short',day:'numeric',month:'short'});
     const done=h.exercises.filter((e) => e.allDone).length;
-    return `<div class="hist-card"><div class="hist-hdr" onclick="toggleHist(${i})"><div><div class="hist-date">${date} — ${h.dayName}</div><div class="hist-type">${h.desc}</div></div><div class="hist-badge">${done}/${h.exercises.length} ✓</div></div><div class="hist-body" id="hb-${i}">${h.exercises.map((e)=>`<div class="hist-row"><span>${e.name}</span><span style="color:var(--muted)">${e.weights&&e.weights[0]>0?e.weights[0]+' ק"ג':'BW'} × ${e.reps}</span>${e.allDone?'<span style="color:var(--green)">✓</span>':''}</div>`).join('')}</div></div>`;
+    return `<div class="hist-card"><div class="hist-hdr" onclick="toggleHist(${i})"><div><div class="hist-date">${date} — ${h.dayName}</div><div class="hist-type">${h.desc}</div></div><div style="display:flex;gap:6px;align-items:center"><div class="hist-badge">${done}/${h.exercises.length} ✓</div><button class="quick-btn" style="padding:4px 8px;font-size:.72rem" onclick="event.stopPropagation();deleteHistorySession(${i})">🗑</button></div></div><div class="hist-body" id="hb-${i}">${h.exercises.map((e)=>`<div class="hist-row"><span>${e.name}</span><span style="color:var(--muted)">${e.weights&&e.weights[0]>0?e.weights[0]+' ק"ג':'BW'} × ${e.reps}</span>${e.allDone?'<span style="color:var(--green)">✓</span>':''}</div>`).join('')}</div></div>`;
   }).join('');
 }
 function toggleHist(i){ document.getElementById('hb-'+i).classList.toggle('open'); }
@@ -395,6 +410,14 @@ function renderStats(){
   const allW=history.flatMap((h)=>h.exercises.flatMap((e)=>e.weights||[])).filter((w)=>w>0);
   const maxW=allW.length?Math.max(...allW):0;
   document.getElementById('stats-grid').innerHTML=`<div class="stat-card"><div class="stat-val">${total}</div><div class="stat-lbl">סה"כ אימונים</div></div><div class="stat-card"><div class="stat-val">${week}</div><div class="stat-lbl">השבוע</div></div><div class="stat-card"><div class="stat-val">${history.filter((h,i,a)=>a.findIndex((x)=>x.day===h.day)===i).length}</div><div class="stat-lbl">סוגי אימונים</div></div><div class="stat-card"><div class="stat-val">${maxW}</div><div class="stat-lbl">שיא משקל ק"ג</div></div>`;
+}
+
+function deleteHistorySession(index) {
+  if (!confirm('למחוק את האימון הזה מההיסטוריה?')) return;
+  history.splice(index, 1);
+  localStorage.setItem('history_v2', JSON.stringify(history));
+  refreshAll();
+  showToast('🗑 אימון נמחק מההיסטוריה');
 }
 
 function renderPlan(){
