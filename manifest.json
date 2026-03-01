@@ -1,0 +1,18 @@
+{
+  "name": "ABCD Workout Tracker",
+  "short_name": "ABCD",
+  "lang": "he",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0d0d14",
+  "theme_color": "#1a1535",
+  "orientation": "portrait",
+  "description": "מעקב תוכנית אימונים בעיצוב מודרני עם סקירה, היסטוריה וניהול תוכנית.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "128x128",
+      "type": "image/svg+xml"
+    }
+  ]
+}
