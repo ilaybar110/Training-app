@@ -1,6 +1,6 @@
 {
-  "name": "ABCD Workout Tracker",
-  "short_name": "ABCD",
+  "name": "Lift It Workout Tracker",
+  "short_name": "Lift It",
   "lang": "he",
   "start_url": "index.html",
   "display": "standalone",

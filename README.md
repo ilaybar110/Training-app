@@ -1,4 +1,4 @@
-# ABCD Workout Tracker
+# Lift It Workout Tracker
 
 אפליקציית מעקב אימונים בעברית (RTL) עם פיצ'רים מתקדמים:
 

@@ -12,12 +12,12 @@ const REST_OPTIONS = [45, 60, 75, 90, 120, 150, 180];
 
 const I18N = {
   he: {
-    title: '💪 אימון ABCD',
+    title: '💪 ליפט איט',
     navOverview: '🏠 סקירה', navHistory: '📊 היסטוריה', navPlan: '📋 תוכנית', navStats: '📈 סטטיסטיקה', navSettings: '⚙️ הגדרות',
     start: '▶ התחל אימון', finish: '✅ סיים וסכם אימון',
   },
   en: {
-    title: '💪 ABCD Workout',
+    title: '💪 Lift It',
     navOverview: '🏠 Overview', navHistory: '📊 History', navPlan: '📋 Plan', navStats: '📈 Statistics', navSettings: '⚙️ Settings',
     start: '▶ Start Workout', finish: '✅ Finish Workout',
   }
@@ -53,6 +53,7 @@ let editingId = null;
 let wmExercises = [];
 let wmIdx = 0;
 let wmSetData = {};
+let pastWizard = { day: 'A', date: '', exercises: [], index: 0, answers: {} };
 let restInterval = null;
 let restTotal = 90;
 let restRemaining = 0;
@@ -70,6 +71,7 @@ function init(){
     currentDay = DAYS_ORDER[(idx+1)%4];
   }
   document.getElementById('past-date').value = new Date().toISOString().split('T')[0];
+  renderPastWizard();
   loadSets();
   renderDaySelector();
   renderTodayCard();
@@ -537,39 +539,76 @@ function renderExerciseChart() {
   if (tip) tip.textContent = `⏳ ${getNoIncreaseText(name)}`;
 }
 
-function parsePastLines(raw) {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [name, wStr, rStr] = line.split('|').map((s) => s?.trim());
-      if (!name || !wStr) return null;
-      const weights = wStr.split(',').map((x) => Number(x.trim()) || 0).filter((x) => x >= 0);
-      const reps = (rStr || '').trim() || '8';
-      return { name, weights, reps, allDone: true, muscle: '' };
-    })
-    .filter(Boolean);
-}
-
-function addPastWorkoutManual() {
+function startPastQuestionnaire() {
   const day = document.getElementById('past-day').value;
   const date = document.getElementById('past-date').value || todayKey();
-  const lines = document.getElementById('past-lines').value;
-  const exercises = parsePastLines(lines);
-  if (!exercises.length) return alert('לא זוהו שורות תקינות.');
+  const exercises = plan.filter((e) => e.day === day);
+  if (!exercises.length) return showToast('אין תרגילים בתוכנית הזו כרגע');
+  pastWizard = { day, date, exercises, index: 0, answers: {} };
+  renderPastWizard();
+}
 
+function renderPastWizard() {
+  const box = document.getElementById('past-wizard');
+  if (!box) return;
+  if (!pastWizard.exercises.length) {
+    box.innerHTML = '<p class="plateau-tip">בחר סוג אימון ולחץ "התחל שאלון אימון עבר".</p>';
+    return;
+  }
+
+  const ex = pastWizard.exercises[pastWizard.index];
+  const saved = pastWizard.answers[ex.id] || { weights: ex.weights.slice(0, ex.sets), reps: ex.reps };
+  const setInputs = Array.from({ length: ex.sets }, (_, i) => {
+    const selected = saved.weights[i] ?? ex.weights[i] ?? ex.weights[0] ?? 0;
+    return `<div><label>סט ${i + 1} משקל</label><select id="pw-weight-${i}">${WEIGHT_OPTIONS.map((w) => `<option value="${w}" ${String(w)===String(selected)?'selected':''}>${w}</option>`).join('')}</select></div>`;
+  }).join('');
+
+  box.innerHTML = `
+    <p><strong>שאלה ${pastWizard.index + 1} מתוך ${pastWizard.exercises.length}</strong></p>
+    <p>${ex.name}</p>
+    <div class="wizard-grid">${setInputs}</div>
+    <div style="margin-top:8px"><label>חזרות</label><select id="pw-reps">${REPS_OPTIONS.map((r)=>`<option value="${r}" ${String(saved.reps).includes(String(r))?'selected':''}>${r}</option>`).join('')}</select></div>
+    <div class="wizard-actions">
+      <button class="quick-btn" ${pastWizard.index===0?'disabled':''} onclick="pastPrevQuestion()">הקודם</button>
+      <button class="quick-btn" onclick="pastNextQuestion()">${pastWizard.index===pastWizard.exercises.length-1?'שמור אימון עבר':'הבא'}</button>
+    </div>
+  `;
+}
+
+function capturePastAnswer() {
+  const ex = pastWizard.exercises[pastWizard.index];
+  const weights = Array.from({ length: ex.sets }, (_, i) => Number(document.getElementById(`pw-weight-${i}`).value || 0));
+  const reps = document.getElementById('pw-reps').value || '8';
+  pastWizard.answers[ex.id] = { name: ex.name, muscle: ex.muscle, weights, reps, allDone: true };
+}
+
+function pastPrevQuestion() {
+  capturePastAnswer();
+  if (pastWizard.index > 0) pastWizard.index -= 1;
+  renderPastWizard();
+}
+
+function pastNextQuestion() {
+  capturePastAnswer();
+  if (pastWizard.index < pastWizard.exercises.length - 1) {
+    pastWizard.index += 1;
+    renderPastWizard();
+    return;
+  }
+
+  const exercises = pastWizard.exercises.map((ex) => pastWizard.answers[ex.id]).filter(Boolean);
   history.unshift({
-    date: new Date(`${date}T10:00:00`).toISOString(),
-    day,
-    dayName: DAY_INFO[day].name,
-    desc: DAY_INFO[day].desc,
+    date: new Date(`${pastWizard.date}T10:00:00`).toISOString(),
+    day: pastWizard.day,
+    dayName: DAY_INFO[pastWizard.day].name,
+    desc: DAY_INFO[pastWizard.day].desc,
     exercises,
   });
   localStorage.setItem('history_v2', JSON.stringify(history));
-  document.getElementById('past-lines').value = '';
+  pastWizard = { day: 'A', date: '', exercises: [], index: 0, answers: {} };
+  document.getElementById('past-wizard').innerHTML = '<p class="plateau-tip">✅ נשמר! אפשר להכניס אימון עבר נוסף.</p>';
   refreshAll();
-  showToast('✅ אימון עבר נוסף ידנית');
+  showToast('✅ אימון עבר נוסף מהשאלון');
 }
 
 async function importPastFromImage(event) {
@@ -580,26 +619,35 @@ async function importPastFromImage(event) {
   try {
     const { data } = await Tesseract.recognize(file, settings.language === 'en' ? 'eng' : 'heb+eng');
     const text = data.text || '';
-    const normalized = text
+    const candidates = text
       .split('\n')
       .map((l) => l.replace(/\s+/g, ' ').trim())
       .filter((l) => l.length > 4)
       .map((l) => {
         const m = l.match(/^(.+?)\s+([\d.,]+(?:\s*,\s*[\d.,]+)*)\s+([\d.,-]+)$/);
         if (!m) return null;
-        return `${m[1]} | ${m[2]} | ${m[3]}`;
+        return { name: m[1], weights: m[2].split(',').map((x) => Number(x.trim()) || 0), reps: m[3], allDone: true, muscle: '' };
       })
-      .filter(Boolean)
-      .join('\n');
+      .filter(Boolean);
 
-    if (!normalized) {
-      status.textContent = '⚠️ לא זוהו שורות אוטומטית. אפשר להדביק ידנית בשדה שמתחת.';
+    if (!candidates.length) {
+      status.textContent = '⚠️ לא זוהו שורות אוטומטית. השתמש בשאלון הידני מעל.';
       return;
     }
 
-    document.getElementById('past-lines').value = normalized;
-    status.textContent = '✅ זיהוי הצליח. בדוק/ערוך ולחץ הוסף אימון עבר ידנית.';
-    showToast('📷 זוהתה טבלה מהתמונה');
+    const day = document.getElementById('past-day').value;
+    const date = document.getElementById('past-date').value || todayKey();
+    history.unshift({
+      date: new Date(`${date}T10:00:00`).toISOString(),
+      day,
+      dayName: DAY_INFO[day].name,
+      desc: DAY_INFO[day].desc,
+      exercises: candidates,
+    });
+    localStorage.setItem('history_v2', JSON.stringify(history));
+    status.textContent = '✅ זוהתה טבלה והאימון נשמר אוטומטית.';
+    refreshAll();
+    showToast('📷 אימון עבר נוסף מתמונה');
   } catch (err) {
     status.textContent = '❌ פענוח נכשל. נסה תמונה חדה יותר.';
   }
