@@ -634,27 +634,86 @@ function pastNextQuestion() {
   showToast('✅ אימון עבר נוסף מהשאלון');
 }
 
+function normalizeOcrText(text) {
+  return (text || '')
+    .replace(/[|]/g, ' ')
+    .replace(/[“”"\t]/g, ' ')
+    .replace(/‏|‎/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractPairs(line) {
+  return [...line.matchAll(/(\d+(?:\.\d+)?)[-–](\d+(?:\.\d+)?)/g)].map((m) => ({
+    raw: m[0],
+    a: Number(m[1]),
+    b: Number(m[2]),
+    index: m.index ?? 0,
+  }));
+}
+
+function parseOcrTableRows(rawText) {
+  const rows = rawText
+    .split('\n')
+    .map((r) => normalizeOcrText(r))
+    .filter(Boolean)
+    .filter((r) => r.length > 8)
+    .filter((r) => !/(אימון|שריר|תרגיל|חזרות|סט\s*1|סט\s*2|סט\s*3|דגשים|זמני\s*מנוחה|מכונה\/ספסל)/i.test(r));
+
+  const parsed = [];
+  for (const row of rows) {
+    const pairs = extractPairs(row);
+    if (!pairs.length) continue;
+
+    let reps = '8-10';
+    let repPairIndex = -1;
+    const firstSmall = pairs.findIndex((p) => p.a <= 30 && p.b <= 30);
+    if (firstSmall >= 0) {
+      reps = `${pairs[firstSmall].a}-${pairs[firstSmall].b}`;
+      repPairIndex = firstSmall;
+    }
+
+    const setPairs = pairs.filter((_, i) => i !== repPairIndex).slice(0, 3);
+    if (!setPairs.length) continue;
+
+    const weights = setPairs.map((p) => p.a).filter((n) => Number.isFinite(n));
+    const firstNumIdx = pairs[0].index;
+    const nameRaw = row.slice(0, firstNumIdx).trim();
+    const name = nameRaw
+      .replace(/^(חזה|גב|כתפיים|יד\s*אחורית|יד\s*קידמית|רגליים|בטן)\s+/i, '')
+      .trim();
+
+    if (!name || weights.length === 0) continue;
+
+    parsed.push({
+      name,
+      weights,
+      reps,
+      allDone: true,
+      muscle: '',
+    });
+  }
+
+  return parsed;
+}
+
 async function importPastFromImage(event) {
   const file = event.target.files[0];
   if (!file) return;
   const status = document.getElementById('ocr-status');
   status.textContent = '🔎 מפענח תמונה...';
+
   try {
-    const { data } = await Tesseract.recognize(file, settings.language === 'en' ? 'eng' : 'heb+eng');
+    const { data } = await Tesseract.recognize(file, settings.language === 'en' ? 'eng' : 'heb+eng', {
+      tessedit_pageseg_mode: '6',
+      preserve_interword_spaces: '1',
+    });
+
     const text = data.text || '';
-    const candidates = text
-      .split('\n')
-      .map((l) => l.replace(/\s+/g, ' ').trim())
-      .filter((l) => l.length > 4)
-      .map((l) => {
-        const m = l.match(/^(.+?)\s+([\d.,]+(?:\s*,\s*[\d.,]+)*)\s+([\d.,-]+)$/);
-        if (!m) return null;
-        return { name: m[1], weights: m[2].split(',').map((x) => Number(x.trim()) || 0), reps: m[3], allDone: true, muscle: '' };
-      })
-      .filter(Boolean);
+    const candidates = parseOcrTableRows(text);
 
     if (!candidates.length) {
-      status.textContent = '⚠️ לא זוהו שורות אוטומטית. השתמש בשאלון הידני מעל.';
+      status.textContent = '⚠️ לא זוהו שורות בטבלה. נסה תמונה ישרה וחדה יותר, או השתמש בשאלון הידני.';
       return;
     }
 
@@ -668,7 +727,7 @@ async function importPastFromImage(event) {
       exercises: candidates,
     });
     localStorage.setItem('history_v2', JSON.stringify(history));
-    status.textContent = '✅ זוהתה טבלה והאימון נשמר אוטומטית.';
+    status.textContent = `✅ זוהו ${candidates.length} תרגילים ונשמר אימון עבר.`;
     refreshAll();
     showToast('📷 אימון עבר נוסף מתמונה');
   } catch (err) {
