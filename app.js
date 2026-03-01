@@ -68,6 +68,8 @@ let editingId = null;
 let wmExercises = [];
 let wmIdx = 0;
 let wmSetData = {};
+let workoutStartedAt = null;
+let lastWorkoutSummary = null;
 let pastWizard = { day: 'A', date: '', exercises: [], index: 0, answers: {} };
 let restInterval = null;
 let restTotal = 90;
@@ -342,7 +344,33 @@ function finishWorkout(){
   history.unshift({ date:new Date().toISOString(), day:currentDay, dayName:DAY_INFO[currentDay].name, desc:DAY_INFO[currentDay].desc, exercises:payloadExercises });
   localStorage.setItem('history_v2',JSON.stringify(history));
   localStorage.removeItem('sets_'+todayKey()+'_'+currentDay);
+
+  let setsDone = 0;
+  let setsIncreased = 0;
+  exes.forEach((ex) => {
+    const live = wmSetData[ex.id];
+    if (!live) {
+      for (let i = 0; i < ex.sets; i += 1) {
+        if (completedSets[`${ex.id}_${i}`]) setsDone += 1;
+      }
+      return;
+    }
+    live.forEach((set, i) => {
+      if (!set.done) return;
+      setsDone += 1;
+      const target = Number(ex.weights[i] ?? ex.weights[0] ?? 0);
+      if (Number(set.weight || 0) > target) setsIncreased += 1;
+    });
+  });
+
+  const durationMs = workoutStartedAt ? Date.now() - workoutStartedAt : 0;
+  const durationMin = Math.max(0, Math.round(durationMs / 60000));
+  lastWorkoutSummary = { durationMin, setsDone, setsIncreased };
+
   completedSets={};
+  workoutStartedAt = null;
+  renderWorkoutSummary();
+  showPage('summary', null);
   showToast('🎉 אימון הושלם ונשמר! כל הכבוד!');
   refreshAll();
 }
@@ -355,6 +383,7 @@ function startWorkout(){
   wmExercises = plan.filter((e) => e.day===currentDay);
   if(!wmExercises.length){ showToast('אין תרגילים לאימון זה'); return; }
   wmIdx=0; wmSetData={};
+  workoutStartedAt = Date.now();
   const saved = JSON.parse(localStorage.getItem('sets_'+todayKey()+'_'+currentDay)||'{}');
   wmExercises.forEach((ex)=>{ wmSetData[ex.id]=Array.from({length:ex.sets},(_,i)=>({weight:ex.weights[i]||ex.weights[0]||0,reps:'8',done:!!saved[ex.id+'_'+i]})); });
   document.getElementById('workout-overlay').classList.add('open');
@@ -746,6 +775,24 @@ function refreshAll() {
   renderInsights();
   renderExerciseOptions();
   renderExerciseChart();
+}
+
+function renderWorkoutSummary() {
+  const summary = lastWorkoutSummary || { durationMin: 0, setsDone: 0, setsIncreased: 0 };
+  const dur = summary.durationMin < 60
+    ? `${summary.durationMin} דקות`
+    : `${Math.floor(summary.durationMin / 60)}:${String(summary.durationMin % 60).padStart(2, '0')} שעות`;
+  const durationEl = document.getElementById('summary-duration');
+  const setsEl = document.getElementById('summary-sets');
+  const incEl = document.getElementById('summary-progressed');
+  if (durationEl) durationEl.textContent = dur;
+  if (setsEl) setsEl.textContent = String(summary.setsDone);
+  if (incEl) incEl.textContent = String(summary.setsIncreased);
+}
+
+function goToOverview() {
+  const btn = document.getElementById('nav-overview');
+  showPage('overview', btn);
 }
 
 function todayKey(){ return new Date().toISOString().split('T')[0]; }

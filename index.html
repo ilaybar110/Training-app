@@ -179,6 +179,11 @@
   .settings-row select,.settings-row input[type="checkbox"] { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; }
   .past-form { display:grid; gap:8px; }
   .past-form input,.past-form select,.past-form textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); }
+  .summary-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:center; }
+  .summary-title { font-size:1.6rem; font-weight:900; margin-bottom:14px; color:var(--green); }
+  .summary-item { margin-bottom:12px; }
+  .summary-item .label { color:var(--muted); font-size:0.85rem; }
+  .summary-item .value { font-size:1.35rem; font-weight:800; }
   .wizard-card { border:1px solid var(--border); border-radius:12px; padding:12px; background:var(--surface); }
   .wizard-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .wizard-actions { display:flex; gap:8px; margin-top:10px; }
@@ -302,6 +307,26 @@
     </div>
   </div>
 </div>
+
+<div id="page-summary" class="page">
+  <div class="summary-card">
+    <div class="summary-title">✅ אימון בוצע</div>
+    <div class="summary-item">
+      <div class="label">משך זמן האימון</div>
+      <div class="value" id="summary-duration">--</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">כמות סטים שבוצעו</div>
+      <div class="value" id="summary-sets">--</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">סטים שבהם העלית משקל</div>
+      <div class="value" id="summary-progressed">--</div>
+    </div>
+    <button class="quick-btn" onclick="goToOverview()">חזרה לסקירה</button>
+  </div>
+</div>
+
 
 <div class="workout-overlay" id="workout-overlay">
   <div class="wm-header">
