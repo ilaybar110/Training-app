@@ -47,6 +47,7 @@ let restRemaining = 0;
 function init(){
   document.getElementById('today-date').textContent = new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   fillWheelOptions();
+  applyHashNavigation();
   if(history.length>0){
     const lastDay = history[0].day;
     const idx = DAYS_ORDER.indexOf(lastDay);
@@ -60,6 +61,15 @@ function init(){
   renderHistory();
   renderPlan();
   renderInsights();
+  renderExerciseOptions();
+  renderExerciseChart();
+}
+
+function applyHashNavigation() {
+  if (location.hash === '#history') {
+    const btn = document.querySelector(".nav-btn:nth-child(2)");
+    if (btn) showPage('history', btn);
+  }
 }
 
 function fillWheelOptions() {
@@ -72,6 +82,7 @@ function showPage(p,btn){
   document.querySelectorAll('.nav-btn').forEach((x) => x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   if(btn) btn.classList.add('active');
+  if (p === 'statistics') renderExerciseChart();
 }
 
 function renderTodayCard(){
@@ -173,7 +184,7 @@ function importData(event) {
       localStorage.setItem('plan_v2', JSON.stringify(plan));
       localStorage.setItem('history_v2', JSON.stringify(history));
       localStorage.setItem('settings_v1', JSON.stringify(settings));
-      renderPlan(); renderExercises(); renderTodayCard(); renderStats(); renderHistory(); renderInsights();
+      renderPlan(); renderExercises(); renderTodayCard(); renderStats(); renderHistory(); renderInsights(); renderExerciseOptions(); renderExerciseChart();
       showToast('📥 הגיבוי נטען בהצלחה');
     } catch {
       alert('קובץ גיבוי לא תקין');
@@ -209,6 +220,35 @@ function selectDay(d){ currentDay=d; loadSets(); renderDaySelector(); renderToda
 function loadSets(){ completedSets = JSON.parse(localStorage.getItem('sets_'+todayKey()+'_'+currentDay)||'{}'); }
 function saveSets(){ localStorage.setItem('sets_'+todayKey()+'_'+currentDay, JSON.stringify(completedSets)); }
 
+function getExerciseMaxSeries(name) {
+  return history
+    .slice()
+    .reverse()
+    .map((session) => {
+      const ex = session.exercises.find((e) => e.name === name);
+      if (!ex) return null;
+      const max = Math.max(...(ex.weights || [0]));
+      return { date: session.date, max, weights: ex.weights || [] };
+    })
+    .filter(Boolean);
+}
+
+function getNoIncreaseText(name) {
+  const series = getExerciseMaxSeries(name);
+  if (series.length < 2) return 'עדיין אין מספיק היסטוריה להשוואת עליית משקל.';
+  let top = series[0].max;
+  let lastIncrease = series[0].date;
+  for (let i = 1; i < series.length; i += 1) {
+    if (series[i].max > top) {
+      top = series[i].max;
+      lastIncrease = series[i].date;
+    }
+  }
+  const days = Math.floor((Date.now() - new Date(lastIncrease).getTime()) / 86400000);
+  if (days <= 0) return 'היום כבר שיפרת משקל!';
+  return `לא עלית משקל כבר ${days} ימים בתרגיל הזה.`;
+}
+
 function renderExercises(){
   const exes = plan.filter((e) => e.day===currentDay);
   const c = document.getElementById('exercises-container');
@@ -218,31 +258,14 @@ function renderExercises(){
   c.innerHTML = exes.map((ex,idx)=>{
     const done = isExDone(ex);
     const suggest = getWeightSuggest(ex);
+    const plateau = getNoIncreaseText(ex.name);
     let setsHtml = '';
     for(let s=0;s<ex.sets;s++){
       const k=ex.id+'_'+s; const isDone=completedSets[k];
       const w=ex.weights[s]||ex.weights[0]||0;
-      setsHtml+=`<div class="set-item ${isDone?'done':''}" onclick="toggleSet(${ex.id},${s},${ex.rest})">
-        <div class="slabel">סט ${s+1}</div>
-        <div class="sweight">${w>0?w+' ק"ג':'BW'}</div>
-        <div class="sreps">${ex.reps}</div>
-      </div>`;
+      setsHtml+=`<div class="set-item ${isDone?'done':''}" onclick="toggleSet(${ex.id},${s},${ex.rest})"><div class="slabel">סט ${s+1}</div><div class="sweight">${w>0?w+' ק"ג':'BW'}</div><div class="sreps">${ex.reps}</div></div>`;
     }
-    return `<div class="ex-card ${done?'done':''}">
-      <div class="ex-header" onclick="toggleCard(${ex.id})">
-        <div class="ex-num">${done?'✓':(idx+1)}</div>
-        <div class="ex-info">
-          <div class="ex-name">${ex.name}</div>
-          <div class="ex-meta">${ex.muscle} • ${ex.sets} סטים × ${ex.reps}${ex.weights[0]>0?' • '+ex.weights[0]+' ק"ג':''}</div>
-        </div>
-      </div>
-      <div class="ex-body" id="eb-${ex.id}" style="display:none">
-        ${ex.coach?`<div class="coach-tip">🏅 ${ex.coach}</div>`:''}
-        ${suggest?`<div class="suggest-up">⬆️ ${suggest}</div>`:''}
-        <div class="sets-grid">${setsHtml}</div>
-        <div class="rest-info">⏱ מנוחה: ${ex.rest} שניות</div>
-      </div>
-    </div>`;
+    return `<div class="ex-card ${done?'done':''}"><div class="ex-header" onclick="toggleCard(${ex.id})"><div class="ex-num">${done?'✓':(idx+1)}</div><div class="ex-info"><div class="ex-name">${ex.name}</div><div class="ex-meta">${ex.muscle} • ${ex.sets} סטים × ${ex.reps}${ex.weights[0]>0?' • '+ex.weights[0]+' ק"ג':''}</div></div></div><div class="ex-body" id="eb-${ex.id}" style="display:none">${ex.coach?`<div class="coach-tip">🏅 ${ex.coach}</div>`:''}${suggest?`<div class="suggest-up">⬆️ ${suggest}</div>`:''}<div class="plateau-tip">⏳ ${plateau}</div><div class="sets-grid">${setsHtml}</div><div class="rest-info">⏱ מנוחה: ${ex.rest} שניות</div></div></div>`;
   }).join('');
   for(const ex of exes){ if(!isExDone(ex)){document.getElementById('eb-'+ex.id).style.display='block';break;} }
 }
@@ -262,12 +285,25 @@ function getWeightSuggest(ex){
 function finishWorkout(){
   const exes = plan.filter((e) => e.day===currentDay);
   if(!exes.filter((e) => isExDone(e)).length){ showToast('⚠️ לא סיימת אף תרגיל'); return; }
-  history.unshift({ date:new Date().toISOString(), day:currentDay, dayName:DAY_INFO[currentDay].name, desc:DAY_INFO[currentDay].desc, exercises:exes.map((ex) => ({name:ex.name,muscle:ex.muscle,weights:ex.weights,reps:ex.reps,allDone:isExDone(ex)})) });
+
+  const payloadExercises = exes.map((ex) => {
+    const live = wmSetData[ex.id];
+    if (!live) return {name:ex.name,muscle:ex.muscle,weights:ex.weights,reps:ex.reps,allDone:isExDone(ex)};
+    return {
+      name: ex.name,
+      muscle: ex.muscle,
+      weights: live.map((s) => Number(s.weight || 0)),
+      reps: live.map((s) => Number(s.reps || 0)).join(','),
+      allDone: live.every((s) => s.done),
+    };
+  });
+
+  history.unshift({ date:new Date().toISOString(), day:currentDay, dayName:DAY_INFO[currentDay].name, desc:DAY_INFO[currentDay].desc, exercises:payloadExercises });
   localStorage.setItem('history_v2',JSON.stringify(history));
   localStorage.removeItem('sets_'+todayKey()+'_'+currentDay);
   completedSets={};
   showToast('🎉 אימון הושלם ונשמר! כל הכבוד!');
-  renderExercises(); renderTodayCard(); renderHistory(); renderStats(); renderInsights();
+  renderExercises(); renderTodayCard(); renderHistory(); renderStats(); renderInsights(); renderExerciseOptions(); renderExerciseChart();
 }
 
 function startRest(secs){ clearInterval(restInterval); restTotal=secs; restRemaining=secs; document.getElementById('rest-overlay').classList.add('open'); updateRestUI(); restInterval=setInterval(()=>{ restRemaining--; updateRestUI(); if(restRemaining<=0){ clearInterval(restInterval); document.getElementById('rest-overlay').classList.remove('open'); showToast('⏰ הגיע הזמן!'); } },1000); }
@@ -279,7 +315,7 @@ function startWorkout(){
   if(!wmExercises.length){ showToast('אין תרגילים לאימון זה'); return; }
   wmIdx=0; wmSetData={};
   const saved = JSON.parse(localStorage.getItem('sets_'+todayKey()+'_'+currentDay)||'{}');
-  wmExercises.forEach((ex)=>{ wmSetData[ex.id]=Array.from({length:ex.sets},(_,i)=>({weight:ex.weights[i]||ex.weights[0]||0,reps:'',done:!!saved[ex.id+'_'+i]})); });
+  wmExercises.forEach((ex)=>{ wmSetData[ex.id]=Array.from({length:ex.sets},(_,i)=>({weight:ex.weights[i]||ex.weights[0]||0,reps:'8',done:!!saved[ex.id+'_'+i]})); });
   document.getElementById('workout-overlay').classList.add('open');
   renderWM();
 }
@@ -300,28 +336,14 @@ function renderWM(){
   document.getElementById('wm-pfill').style.width = pct+'%';
 
   const sets = wmSetData[ex.id];
+  const plateau = getNoIncreaseText(ex.name);
   const setsHtml = sets.map((s,i)=>{
     const isActive = !s.done && sets.slice(0,i).every((x) => x.done);
     const cls = s.done?'wm-done':isActive?'wm-active':'';
-    return `<div class="wm-set-row ${cls}">
-      <div class="wm-snum">${s.done?'✓':(i+1)}</div>
-      <div class="wm-sinfo">
-        <div class="wm-starget">סט ${i+1} • יעד: ${ex.reps}</div>
-        <div class="wm-shint">${s.done?'הושלם ✓':'בחר בגלגלת ולחץ ✓'}</div>
-      </div>
-      <div class="wm-sinputs">
-        <div class="wm-igroup"><label>משקל</label>
-          <select class="wheel-select" ${s.done?'disabled':''} onchange="wmUpdate(${ex.id},${i},'weight',this.value)">${renderSelectOptions(WEIGHT_OPTIONS, s.weight)}</select>
-        </div>
-        <div class="wm-igroup"><label>חזרות</label>
-          <select class="wheel-select" ${s.done?'disabled':''} onchange="wmUpdate(${ex.id},${i},'reps',this.value)">${renderSelectOptions(REPS_OPTIONS, s.reps || 8)}</select>
-        </div>
-        <button class="wm-scheck" onclick="wmDoneSet(${ex.id},${i},${ex.rest})">✓</button>
-      </div>
-    </div>`;
+    return `<div class="wm-set-row ${cls}"><div class="wm-snum">${s.done?'✓':(i+1)}</div><div class="wm-sinfo"><div class="wm-starget">סט ${i+1} • יעד: ${ex.reps}</div><div class="wm-shint">${s.done?'הושלם ✓':'בחר בגלגלת ולחץ ✓'}</div></div><div class="wm-sinputs"><div class="wm-igroup"><label>משקל</label><select class="wheel-select" ${s.done?'disabled':''} onchange="wmUpdate(${ex.id},${i},'weight',this.value)">${renderSelectOptions(WEIGHT_OPTIONS, s.weight)}</select></div><div class="wm-igroup"><label>חזרות</label><select class="wheel-select" ${s.done?'disabled':''} onchange="wmUpdate(${ex.id},${i},'reps',this.value)">${renderSelectOptions(REPS_OPTIONS, s.reps || 8)}</select></div><button class="wm-scheck" onclick="wmDoneSet(${ex.id},${i},${ex.rest})">✓</button></div></div>`;
   }).join('');
 
-  document.getElementById('wm-body').innerHTML = `<div class="wm-ex-muscle">${ex.muscle}</div><div class="wm-ex-name">${ex.name}</div>${ex.coach?`<div class="wm-coach">🏅 ${ex.coach}</div>`:''}<div class="wm-sets">${setsHtml}</div>`;
+  document.getElementById('wm-body').innerHTML = `<div class="wm-ex-muscle">${ex.muscle}</div><div class="wm-ex-name">${ex.name}</div>${ex.coach?`<div class="wm-coach">🏅 ${ex.coach}</div>`:''}<div class="plateau-tip">⏳ ${plateau}</div><div class="wm-sets">${setsHtml}</div>`;
 
   const isLast = wmIdx===total-1;
   const allDone = sets.every((s) => s.done);
@@ -404,11 +426,100 @@ function saveExercise(){
   if(editingId){ const i=plan.findIndex((e)=>e.id===editingId); plan[i]={...plan[i],...data}; }
   else { plan.push({id:Date.now(),...data}); }
   localStorage.setItem('plan_v2',JSON.stringify(plan));
-  closeModal(); renderPlan(); renderExercises(); renderTodayCard();
+  closeModal(); renderPlan(); renderExercises(); renderTodayCard(); renderExerciseOptions();
   showToast('💾 נשמר!');
 }
 
-function deleteExercise(){ if(!confirm('למחוק?')) return; plan=plan.filter((e)=>e.id!==editingId); localStorage.setItem('plan_v2',JSON.stringify(plan)); closeModal(); renderPlan(); renderExercises(); renderTodayCard(); showToast('🗑 נמחק'); }
+function deleteExercise(){ if(!confirm('למחוק?')) return; plan=plan.filter((e)=>e.id!==editingId); localStorage.setItem('plan_v2',JSON.stringify(plan)); closeModal(); renderPlan(); renderExercises(); renderTodayCard(); renderExerciseOptions(); showToast('🗑 נמחק'); }
+
+function renderExerciseOptions() {
+  const select = document.getElementById('exercise-select');
+  if (!select) return;
+  const names = [...new Set(plan.map((e) => e.name).concat(history.flatMap((h) => h.exercises.map((e) => e.name))))].sort((a,b)=>a.localeCompare(b,'he'));
+  select.innerHTML = names.map((name) => `<option value="${name}">${name}</option>`).join('');
+}
+
+function getExerciseCandles(name) {
+  return history
+    .slice()
+    .reverse()
+    .map((session) => {
+      const ex = session.exercises.find((e) => e.name === name);
+      if (!ex || !(ex.weights?.length)) return null;
+      const open = Number(ex.weights[0] || 0);
+      const close = Number(ex.weights[ex.weights.length - 1] || 0);
+      const high = Math.max(...ex.weights.map(Number));
+      const low = Math.min(...ex.weights.map(Number));
+      return { date: new Date(session.date), open, close, high, low };
+    })
+    .filter(Boolean);
+}
+
+function renderExerciseChart() {
+  const select = document.getElementById('exercise-select');
+  const canvas = document.getElementById('candle-chart');
+  const tip = document.getElementById('exercise-trend-text');
+  if (!select || !canvas) return;
+  const name = select.value;
+  const candles = getExerciseCandles(name);
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#10101a';
+  ctx.fillRect(0, 0, w, h);
+
+  if (!candles.length) {
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = '24px Heebo';
+    ctx.fillText('אין מספיק נתונים לתרגיל הזה', 280, 160);
+    if (tip) tip.textContent = 'בצע את התרגיל לפחות פעם אחת כדי לראות גרף.';
+    return;
+  }
+
+  const max = Math.max(...candles.map((c) => c.high));
+  const min = Math.min(...candles.map((c) => c.low));
+  const top = 20; const bottom = h - 40; const left = 50; const right = w - 20;
+  const plotW = right - left;
+  const plotH = bottom - top;
+  const scaleY = (v) => bottom - ((v - min) / Math.max(1, (max - min))) * plotH;
+
+  ctx.strokeStyle = '#2c2c44';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i += 1) {
+    const y = top + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+  }
+
+  candles.forEach((c, i) => {
+    const x = left + (plotW / Math.max(1, candles.length)) * (i + 0.5);
+    const width = Math.max(8, (plotW / Math.max(1, candles.length)) * 0.5);
+    const highY = scaleY(c.high); const lowY = scaleY(c.low);
+    const openY = scaleY(c.open); const closeY = scaleY(c.close);
+    const up = c.close >= c.open;
+    ctx.strokeStyle = up ? '#00e5a0' : '#ff6b8a';
+    ctx.fillStyle = up ? '#00e5a0' : '#ff6b8a';
+
+    ctx.beginPath(); ctx.moveTo(x, highY); ctx.lineTo(x, lowY); ctx.stroke();
+    const bodyTop = Math.min(openY, closeY);
+    const bodyHeight = Math.max(2, Math.abs(closeY - openY));
+    ctx.fillRect(x - width / 2, bodyTop, width, bodyHeight);
+
+    if (i % Math.ceil(candles.length / 6) === 0) {
+      ctx.fillStyle = '#6b6b90';
+      ctx.font = '14px Heebo';
+      ctx.fillText(c.date.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' }), x - 18, h - 14);
+    }
+  });
+
+  ctx.fillStyle = '#9ca3af';
+  ctx.font = '14px Heebo';
+  ctx.fillText(`${min} ק"ג`, 8, bottom);
+  ctx.fillText(`${max} ק"ג`, 8, top + 12);
+
+  if (tip) tip.textContent = `⏳ ${getNoIncreaseText(name)}`;
+}
+
 function todayKey(){ return new Date().toISOString().split('T')[0]; }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
 

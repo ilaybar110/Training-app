@@ -169,6 +169,12 @@
   .empty { text-align:center; padding:50px 20px; color:var(--muted); }
   .empty .em { font-size:3rem; margin-bottom:12px; }
   .add-btn { width:100%; padding:13px; background:transparent; border:1px dashed var(--border); border-radius:14px; color:var(--muted); font-size:0.88rem; font-weight:600; cursor:pointer; margin-bottom:24px; }
+
+  .chart-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:12px; }
+  .chart-controls { display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:12px; }
+  .chart-controls select { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); }
+  #candle-chart { width:100%; height:280px; background:#10101a; border-radius:12px; border:1px solid var(--border); }
+  .plateau-tip { font-size:0.75rem; color:#fbbf24; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -187,6 +193,7 @@
   <button class="nav-btn active" onclick="showPage('overview',this)">🏠 סקירה</button>
   <button class="nav-btn" onclick="showPage('history',this)">📊 היסטוריה</button>
   <button class="nav-btn" onclick="showPage('plan',this)">📋 תוכנית</button>
+  <button class="nav-btn" onclick="showPage('statistics',this)">📈 סטטיסטיקה</button>
 </div>
 
 <div id="page-overview" class="page active">
@@ -214,6 +221,18 @@
 <div id="page-plan" class="page">
   <div id="plan-container"></div>
 </div>
+
+<div id="page-statistics" class="page">
+  <div class="chart-card">
+    <div class="sec-title">📈 גרף נרות לפי תרגיל</div>
+    <div class="chart-controls">
+      <select id="exercise-select" onchange="renderExerciseChart()"></select>
+    </div>
+    <canvas id="candle-chart" width="900" height="320"></canvas>
+    <p id="exercise-trend-text" class="plateau-tip"></p>
+  </div>
+</div>
+
 
 <div class="workout-overlay" id="workout-overlay">
   <div class="wm-header">
